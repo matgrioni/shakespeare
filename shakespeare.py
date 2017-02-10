@@ -1,6 +1,9 @@
 ################################################################################
 #
 # Python module to help analyze shakeseare plays from the Folger online library.
+# Right now this is going off the formatting from King Lear from this online
+# library and makes various assumptions based on this text. Your mileage may
+# vary with other selections from this library.
 #
 ################################################################################
 
