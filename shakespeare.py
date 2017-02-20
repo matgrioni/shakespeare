@@ -20,6 +20,10 @@ class Play(object):
     CHARACTER = '^([A-Z]+),?\s*'
     PADDING = '^=+$'
 
+    ENTER_VERBS = ['ENTER', 'ENTERS']
+    EXIT_VERBS = ['EXIT', 'EXITS']
+    CONJUNCTIONS = '\, AND +| +WITH +|\, +'
+
     def __init__(self, filename):
         with open(filename, 'r') as f:
             self.raw_lines = map(lambda l: l.rstrip('\r\n'), f.readlines())
@@ -109,3 +113,36 @@ class Play(object):
                         # stage notes. So that means that all the content was in
                         # stage notes, so that is a new line.
                         line_num += 1
+
+    def _updateCharactersFromStageNote(self, characters, stage_note):
+        # Enter and exit instructions come in a sentence at a time. That is the
+        # assumption at least.
+        for s in stage_note.upper().split('.'):
+            verb_type = 0
+
+            # Search for enter type verbs and keep track of where it happens
+            # in the sentence. Assume that only one of these verbs occurs per
+            # sentence.
+            f_verb = reduce(lambda f, v:
+                            v if v in s and (not f or len(v) > len(f)) else f,
+                            Play.ENTER_VERBS, None)
+            if f_verb:
+                verb_type = 1
+                idx = s.index(f_verb)
+            else:
+                # Same thing as above but for exit type verbs.
+                f_verb = reduce(lambda f, v:
+                                v if v in s and (not f or len(v) > len(f)) else f,
+                                Play.EXIT_VERBS, None)
+                if f_verb:
+                    verb_type = 2
+                    idx = s.index(f_verb)
+
+            if verb_type != 0:
+                s = (s[:idx] + s[idx + len(f_verb):]).strip()
+                p_characters = set(re.split(Play.CONJUNCTIONS, s))
+
+                if verb_type == 1:
+                    characters |= p_characters
+                elif verb_type == 2:
+                    characters -= p_characters
