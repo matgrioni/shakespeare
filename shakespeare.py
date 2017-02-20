@@ -14,12 +14,18 @@ PlayAtom = namedtuple('PlayAtom', ['act', 'scene', 'num', 'content'])
 StageNote = namedtuple('StageNote', PlayAtom._fields)
 Line = namedtuple('Line', PlayAtom._fields + ('speaker', 'audience'))
 
+Character = namedtuple('Character', ['name', 'short', 'desc'])
+
 class Play(object):
     ACT_HEADER = '^ACT (\d+)$'
     SCENE_HEADER = '^Scene (\d+)$'
     STAGE_NOTES = '\[(.+)\]|\[([^\]]+)|([^\[]+)\]'
     CHARACTER = '^([A-Z]+),?\s*'
     PADDING = '^=+$'
+
+    CHARACTERS_SECTION_HEADER = 'Characters in the Play'
+    CHARACTER_LISTING = '^(.+?)(, (.+))?$'
+    CHARACTER_OF = ' OF '
 
     ENTER_VERBS = ['ENTER', 'ENTERS']
     EXIT_VERBS = ['EXIT', 'EXITS']
@@ -33,87 +39,124 @@ class Play(object):
             # The title is the first line of the file
             self.title = self.raw_lines[0]
 
-            act = 0
-            scene = 0
-            line_num = 1
-            last_blank = -1
-            multiline_stage_note = False
-            character = ''
-            for i, line in enumerate(self.raw_lines):
-                m = re.match(Play.ACT_HEADER, line)
-                if m:
-                    act = int(m.group(1))
-                    continue
+            self._parseCharacters()
+            self._parseActs()
 
-                m = re.match(Play.SCENE_HEADER, line)
-                if m:
-                    scene = int(m.group(1))
-                    line_num = 1
-                    continue
 
-                # Do not bother if the line is a padded line.
-                if re.match(Play.PADDING, line):
-                    continue
+    # A compartmentalized method to read in the list of characters at the
+    # beginning of the play. These names are not used directly in the atoms list
+    # however they are useful still. For example, on parsing the stage notes
+    # one must be able to tell if a potential character is actually a character.
+    def _parseCharacters(self):
+        self.characters = []
 
-                # If the line is a blank line, then keep track of it.
+        header_found = False
+        for line in self.raw_lines:
+            # Once we've reached the character section, and there is a blank
+            # line, the character section is over.
+            if header_found and not re.match(Play.PADDING, line):
                 if not line:
-                    last_blank = i
-                    continue
+                    break
 
-                # A line for the act and for the scene has been found and this
-                # line is not a padding line or a blank line, so it is a content
-                # line to be added.
-                if act >= 1 and scene >= 1:
-                    m = re.search(Play.STAGE_NOTES, line)
-                    if m:
-                        if m.group(1):
-                            stage_note = StageNote(act, scene, line_num, m.group(1))
-                            self.atoms.append(stage_note)
-                        elif m.group(2):
-                            stage_note = StageNote(act, scene, line_num, m.group(2))
-                            self.atoms.append(stage_note)
+                m = re.match(Play.CHARACTER_LISTING, line)
+                name = m.group(1)
+                short = ''
+                desc = m.group(3)
 
-                            multiline_stage_note = True
-                        elif m.group(3):
-                            stage_note = StageNote(act, scene, line_num, m.group(3))
-                            self.atoms.append(stage_note)
+                if Play.CHARACTER_OF in name:
+                    idx = name.index(Play.CHARACTER_OF)
+                    short = name[idx + len(Play.CHARACTER_OF):]
 
-                            multiline_stage_note = False
+                self.characters.append(Character(name, short, desc))
 
-                        line = line[:m.start()] + line[m.end():]
-                    elif multiline_stage_note:
-                        # If the stage note spans 3 lines or more, than the
-                        # second line has no annotation to show that it is a
-                        # stage note. So we keep track of if a stage note has
-                        # been opened but not closed yet. In this case this
-                        # entire line is part of that stage note.
-                        stage_note = StageNote(act, scene, line_num, line)
+            if not header_found:
+                header_found = line == Play.CHARACTERS_SECTION_HEADER
+
+    # A compartmentalized method to initialize reading the acts of the play
+    # after all the introductory information.
+    def _parseActs(self):
+        act = 0
+        scene = 0
+        line_num = 1
+        last_blank = -1
+        multiline_stage_note = False
+        character = ''
+        for i, line in enumerate(self.raw_lines):
+            m = re.match(Play.ACT_HEADER, line)
+            if m:
+                act = int(m.group(1))
+                continue
+
+            m = re.match(Play.SCENE_HEADER, line)
+            if m:
+                scene = int(m.group(1))
+                line_num = 1
+                continue
+
+            # Do not bother if the line is a padded line.
+            if re.match(Play.PADDING, line):
+                continue
+
+            # If the line is a blank line, then keep track of it.
+            if not line:
+                last_blank = i
+                continue
+
+            # A line for the act and for the scene has been found and this
+            # line is not a padding line or a blank line, so it is a content
+            # line to be added.
+            if act >= 1 and scene >= 1:
+                m = re.search(Play.STAGE_NOTES, line)
+                if m:
+                    if m.group(1):
+                        stage_note = StageNote(act, scene, line_num, m.group(1))
                         self.atoms.append(stage_note)
-                        line = ''
+                    elif m.group(2):
+                        stage_note = StageNote(act, scene, line_num, m.group(2))
+                        self.atoms.append(stage_note)
 
-                    if line:
-                        # If the last line was a blank, then a character name
-                        # might be on this line.
-                        start_index = 0
-                        if i - 1 == last_blank:
-                            m = re.match(Play.CHARACTER, line)
-                            if m:
-                                character = m.group(1)
-                                start_index = m.end()
+                        multiline_stage_note = True
+                    elif m.group(3):
+                        stage_note = StageNote(act, scene, line_num, m.group(3))
+                        self.atoms.append(stage_note)
 
-                        # Get the dialogue after the characters name and if
-                        # there is any, then add it to the lines.
-                        dialogue = line[start_index:]
-                        if dialogue:
-                            l = Line(act, scene, line_num, dialogue, character, None)
-                            self.atoms.append(l)
+                        multiline_stage_note = False
 
-                            line_num += 1
-                    else:
-                        # The line originally had content, but it was removed by
-                        # stage notes. So that means that all the content was in
-                        # stage notes, so that is a new line.
+                    line = line[:m.start()] + line[m.end():]
+                elif multiline_stage_note:
+                    # If the stage note spans 3 lines or more, than the
+                    # second line has no annotation to show that it is a
+                    # stage note. So we keep track of if a stage note has
+                    # been opened but not closed yet. In this case this
+                    # entire line is part of that stage note.
+                    stage_note = StageNote(act, scene, line_num, line)
+                    self.atoms.append(stage_note)
+                    line = ''
+
+                if line:
+                    # If the last line was a blank, then a character name
+                    # might be on this line.
+                    start_index = 0
+                    if i - 1 == last_blank:
+                        m = re.match(Play.CHARACTER, line)
+                        if m:
+                            character = m.group(1)
+                            start_index = m.end()
+
+                    # Get the dialogue after the characters name and if
+                    # there is any, then add it to the lines.
+                    dialogue = line[start_index:]
+                    if dialogue:
+                        l = Line(act, scene, line_num, dialogue, character, None)
+                        self.atoms.append(l)
+
                         line_num += 1
+                else:
+                    # The line originally had content, but it was removed by
+                    # stage notes. So that means that all the content was in
+                    # stage notes, so that is a new line.
+                    line_num += 1
+
 
     def _updateCharactersFromStageNote(self, characters, stage_note):
         # Enter and exit instructions come in a sentence at a time. That is the
