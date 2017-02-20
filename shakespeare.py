@@ -11,6 +11,7 @@ from collections import namedtuple
 import re
 
 PlayAtom = namedtuple('PlayAtom', ['act', 'scene', 'num', 'content'])
+StageNote = namedtuple('StageNote', PlayAtom._fields)
 Line = namedtuple('Line', PlayAtom._fields + ('speaker', 'audience'))
 
 class Play(object):
@@ -66,15 +67,15 @@ class Play(object):
                     m = re.search(Play.STAGE_NOTES, line)
                     if m:
                         if m.group(1):
-                            stage_note = PlayAtom(act, scene, line_num, m.group(1))
+                            stage_note = StageNote(act, scene, line_num, m.group(1))
                             self.atoms.append(stage_note)
                         elif m.group(2):
-                            stage_note = PlayAtom(act, scene, line_num, m.group(2))
+                            stage_note = StageNote(act, scene, line_num, m.group(2))
                             self.atoms.append(stage_note)
 
                             multiline_stage_note = True
                         elif m.group(3):
-                            stage_note = PlayAtom(act, scene, line_num, m.group(3))
+                            stage_note = StageNote(act, scene, line_num, m.group(3))
                             self.atoms.append(stage_note)
 
                             multiline_stage_note = False
@@ -86,7 +87,7 @@ class Play(object):
                         # stage note. So we keep track of if a stage note has
                         # been opened but not closed yet. In this case this
                         # entire line is part of that stage note.
-                        stage_note = PlayAtom(act, scene, line_num, line)
+                        stage_note = StageNote(act, scene, line_num, line)
                         self.atoms.append(stage_note)
                         line = ''
 
