@@ -32,7 +32,10 @@ class Play(object):
 
     ENTER_VERBS = ['ENTER', 'ENTERS']
     EXIT_VERBS = ['EXIT', 'EXITS']
-    CONJUNCTIONS = '\, AND +|\, +'
+    CONJUNCTIONS = '\, +AND +|\, *'
+    SING_PRONOUNS = ['HE', 'SHE']
+    PLURAL_PRONOUNS = ['THEY', 'ALL']
+    NEG_MODIFIERS = ['BUT']
 
     def __init__(self, filename):
         with open(filename, 'r') as f:
@@ -81,8 +84,13 @@ class Play(object):
         scene = 0
         line_num = 1
         last_blank_or_ann = -1
+
         multiline_stage_note = False
+        last_stage_notes = []
+
         character = None
+        aud = set()
+
         for i, line in enumerate(self.raw_lines):
             m = re.match(Play.ACT_HEADER, line)
             if m:
@@ -111,6 +119,18 @@ class Play(object):
             # line is not a padding line or a blank line, so it is a content
             # line to be added.
             if act >= 1 and scene >= 1:
+                # If the last line was a blank, then a character name
+                # might be on this line.
+                start_index = 0
+                if i - 1 == last_blank_or_ann:
+                    m = re.match(Play.CHARACTER, line)
+                    if m:
+                        character = m.group(1)
+                        start_index = m.end()
+
+                line = line[start_index:]
+
+                stage_note = None
                 m = re.search(Play.STAGE_NOTES, line)
                 if m:
                     if m.group(1):
@@ -138,9 +158,16 @@ class Play(object):
                     self.atoms.append(stage_note)
                     line = ''
 
+                if stage_note:
+                    last_stage_notes.append(stage_note)
+
                 # If there is no more line, then it was all stage notes, so
                 # don't try to look for and add character / dialogue.
                 if line:
+                    if last_stage_notes:
+                        self._updateAudienceFromStageNotes(aud, last_stage_notes)
+                        del last_stage_notes[:]
+
                     # Check if there are annotations on this line, in which case
                     # it is the only thing on the line and we do not have to
                     # look for dialogue.
@@ -151,23 +178,10 @@ class Play(object):
                         line_num += 1
                         last_blank_or_ann = i
                     else:
-                        # If the last line was a blank, then a character name
-                        # might be on this line.
-                        start_index = 0
-                        if i - 1 == last_blank_or_ann:
-                            m = re.match(Play.CHARACTER, line)
-                            if m:
-                                character = m.group(1)
-                                start_index = m.end()
+                        l = Line(act, scene, line_num, line, character, aud.copy())
+                        self.atoms.append(l)
 
-                        # Get the dialogue after the characters name and if
-                        # there is any, then add it to the lines.
-                        dialogue = line[start_index:]
-                        if dialogue:
-                            l = Line(act, scene, line_num, dialogue, character, None)
-                            self.atoms.append(l)
-
-                            line_num += 1
+                        line_num += 1
                 else:
                     # The line originally had content, but it was removed by
                     # stage notes. So that means that all the content was in
@@ -175,13 +189,19 @@ class Play(object):
                     line_num += 1
 
     # Updates the given audience from the stage_note and last character's line.
-    # Audience should be a set and stage_note a string. Essentially, ENTER_VERBS
-    # and EXIT_VERBS are looked for by sentence, and any character names in
-    # in these sentences are updated through the audience.
-    def _updateAudienceFromStageNote(self, audience, stage_note):
+    # Audience should be a set and stage_notes a list of StageNote tuples.
+    # Essentially, ENTER_VERBS and EXIT_VERBS are looked for by sentence, and
+    # any character names in these sentences are updated through the audience.
+    # It is assumed that stage_notes is a list of consecutive stage_notes. This
+    # is to account for multiline stage notes which are parsed into several
+    # different PlayAtoms.
+    def _updateAudienceFromStageNotes(self, audience, stage_notes):
+        content = reduce(lambda c, sn: c + sn.content, stage_notes, '')
+        last_c = stage_notes[0].context
+
         # Enter and exit instructions come in a sentence at a time. That is the
         # assumption at least.
-        for s in stage_note.upper().split('.'):
+        for s in content.upper().split('.'):
             verb_type = 0
 
             # Search for enter type verbs and keep track of where it happens
@@ -204,18 +224,32 @@ class Play(object):
 
             if verb_type != 0:
                 s = (s[:idx] + s[idx + len(f_verb):]).strip()
-                conjuncts = set(re.split(Play.CONJUNCTIONS, s))
+                conjuncts = re.split(Play.CONJUNCTIONS, s)
                 p_characters = set()
 
+                neg = False
                 for p_character in conjuncts:
                     for word in p_character.split():
                         if self._existsCharacter(word):
-                            p_characters.add(word)
+                            # If there was a negative word, it means the
+                            # character is not a operand of the ENTER or EXIT
+                            # operation.
+                            if not neg:
+                                p_characters.add(word)
+                            else:
+                                print word
+                                p_characters.remove(word)
+                        elif word in Play.SING_PRONOUNS:
+                            p_characters.add(stage_notes[0].context)
+                        elif word in Play.PLURAL_PRONOUNS:
+                            p_characters |= audience
+                        elif word in Play.NEG_MODIFIERS:
+                            neg = True
 
                 if verb_type == 1:
-                    characters |= p_characters
+                    audience |= p_characters
                 elif verb_type == 2:
-                    characters -= p_characters
+                    audience -= p_characters
 
     def _existsCharacter(self, p_name):
         u = p_name.upper()
