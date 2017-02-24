@@ -45,14 +45,14 @@ class Play(object):
             # The title is the first line of the file
             self.title = self.raw_lines[0]
 
-            self._parseCharacters()
-            self._parseActs()
+            self._parse_characters()
+            self._parse_acts()
 
     # A compartmentalized method to read in the list of characters at the
     # beginning of the play. These names are not used directly in the atoms list
     # however they are useful still. For example, on parsing the stage notes
     # one must be able to tell if a potential character is actually a character.
-    def _parseCharacters(self):
+    def _parse_characters(self):
         self.characters = []
 
         header_found = False
@@ -79,7 +79,7 @@ class Play(object):
 
     # A compartmentalized method to initialize reading the acts of the play
     # after all the introductory information.
-    def _parseActs(self):
+    def _parse_acts(self):
         act = 0
         scene = 0
         line_num = 1
@@ -165,7 +165,7 @@ class Play(object):
                 # don't try to look for and add character / dialogue.
                 if line:
                     if last_stage_notes:
-                        self._updateAudienceFromStageNotes(aud, last_stage_notes)
+                        self._update_audience_from_stage_notes(aud, last_stage_notes)
                         del last_stage_notes[:]
 
                     # Check if there are annotations on this line, in which case
@@ -195,7 +195,7 @@ class Play(object):
     # It is assumed that stage_notes is a list of consecutive stage_notes. This
     # is to account for multiline stage notes which are parsed into several
     # different PlayAtoms.
-    def _updateAudienceFromStageNotes(self, audience, stage_notes):
+    def _update_audience_from_stage_notes(self, audience, stage_notes):
         content = reduce(lambda c, sn: c + sn.content, stage_notes, '')
         last_c = stage_notes[0].context
 
@@ -230,14 +230,13 @@ class Play(object):
                 neg = False
                 for p_character in conjuncts:
                     for word in p_character.split():
-                        if self._existsCharacter(word):
+                        if self._exists_character(word):
                             # If there was a negative word, it means the
                             # character is not a operand of the ENTER or EXIT
                             # operation.
                             if not neg:
                                 p_characters.add(word)
                             else:
-                                print word
                                 p_characters.remove(word)
                         elif word in Play.SING_PRONOUNS:
                             p_characters.add(stage_notes[0].context)
@@ -251,7 +250,7 @@ class Play(object):
                 elif verb_type == 2:
                     audience -= p_characters
 
-    def _existsCharacter(self, p_name):
+    def _exists_character(self, p_name):
         u = p_name.upper()
         return reduce(lambda flag, c:
                       flag or u == c.name or u == c.short,
