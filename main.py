@@ -44,10 +44,21 @@ def find_inter_annotations(play):
 
     return inters
 
-if len(sys.argv) >= 2:
-    filename = sys.argv[1]
+if len(sys.argv) >= 3:
+    play_filename = sys.argv[1]
+    ann_key_filename = sys.argv[2]
 else:
-    raise TypeError("Filename should be first command line argument")
+    raise TypeError("Illegal number of arguments.")
 
-p = Play(filename)
+# The annotation key is the file that explicitly states which annotation ids
+# are associated with which characters.
+annotation_key = {}
+with open(ann_key_filename, 'r') as f:
+    for line in f:
+        items = line.rstrip().split(', ')
+        annotation_key[items[0]] = (items[1], items[2])
+
+print annotation_key
+
+p = Play(play_filename)
 anns = find_inter_annotations(p)
