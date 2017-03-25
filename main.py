@@ -8,7 +8,7 @@ import collections
 import re
 import sys
 
-from shakespeare import Play, Annotation
+from shakespeare import Play
 
 # Goes through every atom in the play and returns a dictionary where the
 # annotations are keys, and the lines between the BEGIN and END annotations
@@ -62,6 +62,25 @@ def condense_character_lines(character, lines):
 
     return ' '.join(blurbs)
 
+# Returns all PlayAtoms in the play up to an PlayAtom whose content that matches
+# the provided regex.
+def up_to_content(play, content_regex):
+    atoms = []
+    for atom in play.atoms:
+        m = re.search(content_regex, atom.content)
+        if m:
+            break
+
+        atoms.append(atom)
+
+    return atoms
+
+################################################################################
+#
+# Main script.
+#
+################################################################################
+
 if len(sys.argv) >= 3:
     play_filename = sys.argv[1]
     ann_key_filename = sys.argv[2]
@@ -70,14 +89,17 @@ else:
 
 # The annotation key is the file that explicitly states which annotation ids
 # are associated with which characters.
-annotation_key = {}
+annotations = {}
 with open(ann_key_filename, 'r') as f:
     for line in f:
         items = line.rstrip().split(', ')
-        annotation_key[items[0]] = (items[1], items[2])
+        annotations[items[0]] = (items[1], items[2])
 
 p = Play(play_filename)
-inter_anns = find_inter_annotations(p)
 
-for ann_id, lines in inter_anns.items():
-    pass
+# Each annotation consists of the key value in the tex and also a dyad or pair
+# of characters involved in the betrayal.
+for key, dyad in annotations.items():
+    prior_betrayal = up_to_content(p, key + '_HOSTILE_.+_BEGIN')
+    print key
+    print prior_betrayal[-10:]

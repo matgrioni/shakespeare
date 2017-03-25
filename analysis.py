@@ -6,10 +6,6 @@
 #
 ################################################################################
 
-POSITIVE_SENTIMENT = 'Positive'
-NEGATIVE_SENTIMENT = 'Negative'
-NEUTRAL_SENTIMENT  = 'Neutral'
-
 # Provide the StanfordCoreNLP object and the text to annotate. A list of scores
 # will be returned. The location of the score corresponds to the sentence in the
 # original sentence. The scores are scalars with the following meanings:
@@ -25,11 +21,11 @@ def sentiment(nlp, text):
     return map(_get_scalar_sentiment, result['sentences'])
 
 def _get_scalar_sentiment(sentence):
-    sentiment = sentence['sentiment']
+    sentiment = sentence['sentimentValue']
 
-    if sentiment == POSITIVE_SENTIMENT:
+    if sentiment > 2:
         return 1
-    elif sentiment == NEGATIVE_SENTIMENT:
+    elif sentiment < 2:
         return -1
     else:
         return 0
