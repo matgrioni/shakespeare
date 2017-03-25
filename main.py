@@ -51,8 +51,9 @@ def find_inter_annotations(play):
 
     return inters
 
-# Condense the lines of the given character from the provided lines (which may
-# include lines from other characters) into sentences.
+# Condense the PlayAtoms of the given character from the provided list (which may
+# include lines from other characters) into sentences. This will return one
+# continuous string of the desired characters dialogue from the given PlayAtoms.
 def condense_character_lines(character, lines):
     blurbs = []
 
@@ -101,13 +102,17 @@ for key, dyad in annotations.items():
             break
 
         try:
-            if (atom.speaker == dyad[0] and dyad[1] in atom.audience) or (atom.speaker == dyad[1] and dyad[0] in atom.audience):
+            if (atom.speaker == dyad[0] and dyad[1] in atom.audience) or \
+               (atom.speaker == dyad[1] and dyad[0] in atom.audience):
                 prior_betrayal.append(atom)
         except AttributeError:
             # The atom was an Annotation or a StageNote and so does not have a
             # speaker or audience.
             pass
 
+    # From all the PlayAtoms extracted before the first hosility, condense the
+    # betrayer's and victim's lines into one continuous string. This string will
+    # be provided to the StanfordCoreNLP server.
     betrayer_diag = condense_character_lines(dyad[0], prior_betrayal)
     victim_diag = condense_character_lines(dyad[1], prior_betrayal)
 
@@ -124,6 +129,7 @@ for key, dyad in annotations.items():
     else:
         p_v = 0
 
+    # Print out the results.
     print key
     print 'Betrayer sentences: ' + str(len(betrayer_sent))
     print 'Betrayer words: ' + str(len(betrayer_diag.split(' ')) - 1)
