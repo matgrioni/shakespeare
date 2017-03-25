@@ -21,7 +21,7 @@ def sentiment(nlp, text):
     return map(_get_scalar_sentiment, result['sentences'])
 
 def _get_scalar_sentiment(sentence):
-    sentiment = sentence['sentimentValue']
+    sentiment = int(sentence['sentimentValue'])
 
     if sentiment > 2:
         return 1

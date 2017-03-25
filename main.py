@@ -4,10 +4,15 @@
 # Shakespeare play and let it go to work.
 ################################################################################
 
+from __future__ import division
+
 import collections
 import re
 import sys
 
+from pycorenlp import StanfordCoreNLP
+
+import analysis
 from shakespeare import Play
 
 # Goes through every atom in the play and returns a dictionary where the
@@ -62,19 +67,6 @@ def condense_character_lines(character, lines):
 
     return ' '.join(blurbs)
 
-# Returns all PlayAtoms in the play up to an PlayAtom whose content that matches
-# the provided regex.
-def up_to_content(play, content_regex):
-    atoms = []
-    for atom in play.atoms:
-        m = re.search(content_regex, atom.content)
-        if m:
-            break
-
-        atoms.append(atom)
-
-    return atoms
-
 ################################################################################
 #
 # Main script.
@@ -85,7 +77,9 @@ if len(sys.argv) >= 3:
     play_filename = sys.argv[1]
     ann_key_filename = sys.argv[2]
 else:
-    raise TypeError("Illegal number of arguments.")
+    raise TypeError('Illegal number of arguments.')
+
+nlp = StanfordCoreNLP('http://localhost:9000')
 
 # The annotation key is the file that explicitly states which annotation ids
 # are associated with which characters.
@@ -100,6 +94,41 @@ p = Play(play_filename)
 # Each annotation consists of the key value in the tex and also a dyad or pair
 # of characters involved in the betrayal.
 for key, dyad in annotations.items():
-    prior_betrayal = up_to_content(p, key + '_HOSTILE_.+_BEGIN')
+    prior_betrayal = []
+    for atom in p.atoms:
+        m = re.search(key + '_HOSTILE_.+_BEGIN', atom.content)
+        if m:
+            break
+
+        try:
+            if (atom.speaker == dyad[0] and dyad[1] in atom.audience) or (atom.speaker == dyad[1] and dyad[0] in atom.audience):
+                prior_betrayal.append(atom)
+        except AttributeError:
+            # The atom was an Annotation or a StageNote and so does not have a
+            # speaker or audience.
+            pass
+
+    betrayer_diag = condense_character_lines(dyad[0], prior_betrayal)
+    victim_diag = condense_character_lines(dyad[1], prior_betrayal)
+
+    betrayer_sent = analysis.sentiment(nlp, betrayer_diag)
+    victim_sent = analysis.sentiment(nlp, victim_diag)
+
+    if len(betrayer_sent) > 0:
+        p_b = sum(s > 0 for s in betrayer_sent) / len(betrayer_sent)
+    else:
+        p_b = 0
+
+    if len(victim_sent) > 0:
+        p_v = sum(s > 0 for s in victim_sent) / len(victim_sent)
+    else:
+        p_v = 0
+
     print key
-    print prior_betrayal[-10:]
+    print 'Betrayer sentences: ' + str(len(betrayer_sent))
+    print 'Betrayer words: ' + str(len(betrayer_diag.split(' ')) - 1)
+    print 'Betrayer percent positive: ' + str(p_b)
+    print 'Victim sentences: ' + str(len(victim_sent))
+    print 'Victim words: ' + str(len(victim_diag.split(' ')) - 1)
+    print 'Victim percent positive: ' + str(p_v)
+    print
