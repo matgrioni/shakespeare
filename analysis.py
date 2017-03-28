@@ -8,6 +8,7 @@
 ################################################################################
 
 from __future__ import division
+import math
 
 import numpy
 
@@ -38,20 +39,30 @@ def _get_scalar_sentiment(sentence):
     else:
         return 0
 
-# Runs a bootstrap error for standord errors in the values. For any scalar
-# values, (where addition and division are defined) a standard error range will
-# be returned as a two-tuple. The two-tuple will be of the format (min, max),
-# where ~2.5% of the samples had an average less than min, and ~2.5% of the
-# samples had an average greater than max. You are guaranteed at maximum these
-# values. The actual percentages may be less depending on the number of samples.
-def bootstrap(values, num_samples, sample_size):
-    samples = numpy.random.choice(values, size=(num_samples, sample_size),
+# Runs a bootstrap error for standord errors in the values. For any type of
+# objects a standard error range will be returned as a two-tuple. The two-tuple
+# will be of the format (min, max), where ~2.5% of the samples had a value
+# less than min, and ~2.5% of the samples had an value greater than max. You
+# are guaranteed at maximum these percentages. The actual percentages may be
+# less depending on the number of samples. Lastly, since the objects can be any
+# arbitrary objects a callback, sample_value must be provided that accepts a
+# sample and returns a scalar value. This is the value that is used to compare
+# samples.
+#
+# For example if the sample_value function returns the average of the sample,
+# then this method returns the variance of objects average. If sample_value
+# calculates the percentage of values greater than 0, then this method returns
+# the variance of the percentage of values greater than 0 in the entire objects
+# list.
+def bootstrap(objects, num_samples, sample_size, sample_value):
+    samples = numpy.random.choice(objects, size=(num_samples, sample_size),
                                   replace=True).tolist()
 
     lower = int(num_samples * 0.025)
-    upper = min(int(num_samples * 0.975) + 1, num_samples - 1)
+    upper = min(int(math.ceil(num_samples * 0.975)) - 1, num_samples - 1)
 
-    avgs = map(lambda sample: sum(sample) / sample_size, samples)
-    avgs.sort()
+    values = map(sample_value, samples)
+    values.sort()
+    print values
 
-    return (avgs[lower], avgs[upper])
+    return (values[lower], values[upper])
