@@ -15,11 +15,16 @@ from pycorenlp import StanfordCoreNLP
 import analysis
 from shakespeare import Play
 
+BOOTSTRAP_NUM_SAMPLES = 1000
+BOOTSTRAP_SAMPLE_SIZE = 100
+
 # Goes through every atom in the play and returns a dictionary where the
 # annotations are keys, and the lines between the BEGIN and END annotations
 # are the values. The annotations are transformed into a 3-tuple of the form
 # (ID, Desc, Num), where ID is the identifier for the annotation such as 'GonL',
 # Desc, is something like 'PLAN', or 'HOSTILE', and Num is simply a number.
+# NOTE: This function isn't being used right now. It is a hold over from my
+# first thoughts on the project.
 def find_inter_annotations(play):
     BEGIN_ANNOTATION = '^(.+)_(.+)_(\d+)_BEGIN$'
     END_ANNOTATION = '^(.+)_(.+)_(\d+)_END$'
@@ -68,6 +73,9 @@ def condense_character_lines(character, lines):
 
     return ' '.join(blurbs)
 
+def sentiments_to_percent_positive(sents):
+    return sum(s > 0 for s in sents) / len(sents)
+
 ################################################################################
 #
 # Main script.
@@ -88,22 +96,22 @@ annotations = {}
 with open(ann_key_filename, 'r') as f:
     for line in f:
         items = line.rstrip().split(', ')
-        annotations[items[0]] = (items[1], items[2])
+        annotations[items[0]] = tuple(items[1:])
 
 p = Play(play_filename)
 
 # Each annotation consists of the key value in the tex and also a dyad or pair
 # of characters involved in the betrayal.
-for key, dyad in annotations.items():
+for key, info in annotations.items():
     prior_betrayal = []
     for atom in p.atoms:
-        m = re.search(key + '_HOSTILE_.+_BEGIN', atom.content)
+        m = re.search(key + '_HOSTILE_' + info[2]  + '_BEGIN', atom.content)
         if m:
             break
 
         try:
-            if (atom.speaker == dyad[0] and dyad[1] in atom.audience) or \
-               (atom.speaker == dyad[1] and dyad[0] in atom.audience):
+            if (atom.speaker == info[0] and info[1] in atom.audience) or \
+               (atom.speaker == info[1] and info[0] in atom.audience):
                 prior_betrayal.append(atom)
         except AttributeError:
             # The atom was an Annotation or a StageNote and so does not have a
@@ -113,28 +121,38 @@ for key, dyad in annotations.items():
     # From all the PlayAtoms extracted before the first hosility, condense the
     # betrayer's and victim's lines into one continuous string. This string will
     # be provided to the StanfordCoreNLP server.
-    betrayer_diag = condense_character_lines(dyad[0], prior_betrayal)
-    victim_diag = condense_character_lines(dyad[1], prior_betrayal)
+    betrayer_diag = condense_character_lines(info[0], prior_betrayal)
+    victim_diag = condense_character_lines(info[1], prior_betrayal)
 
-    betrayer_sent = analysis.sentiment(nlp, betrayer_diag)
-    victim_sent = analysis.sentiment(nlp, victim_diag)
+    betrayer_sents = analysis.sentiment(nlp, betrayer_diag)
+    victim_sents = analysis.sentiment(nlp, victim_diag)
 
-    if len(betrayer_sent) > 0:
-        p_b = sum(s > 0 for s in betrayer_sent) / len(betrayer_sent)
+    if len(betrayer_sents) > 0:
+        p_b = sentiments_to_percent_positive(betrayer_sents)
+        bootstrap_b = analysis.bootstrap(betrayer_sents, BOOTSTRAP_NUM_SAMPLES,
+                                         BOOTSTRAP_SAMPLE_SIZE,
+                                         sentiments_to_percent_positive)
     else:
         p_b = 0
+        bootstrap_b = 0
 
-    if len(victim_sent) > 0:
-        p_v = sum(s > 0 for s in victim_sent) / len(victim_sent)
+    if len(victim_sents) > 0:
+        p_v = sentiments_to_percent_positive(victim_sents)
+        bootstrap_v = analysis.bootstrap(victim_sents, BOOTSTRAP_NUM_SAMPLES,
+                                         BOOTSTRAP_SAMPLE_SIZE,
+                                         sentiments_to_percent_positive)
     else:
         p_v = 0
+        bootstrap_v = 0
 
     # Print out the results.
     print key
-    print 'Betrayer sentences: ' + str(len(betrayer_sent))
+    print 'Betrayer sentences: ' + str(len(betrayer_sents))
     print 'Betrayer words: ' + str(len(betrayer_diag.split(' ')) - 1)
     print 'Betrayer percent positive: ' + str(p_b)
-    print 'Victim sentences: ' + str(len(victim_sent))
+    print 'Betrayer percent bootstrap: ' + str(bootstrap_b)
+    print 'Victim sentences: ' + str(len(victim_sents))
     print 'Victim words: ' + str(len(victim_diag.split(' ')) - 1)
     print 'Victim percent positive: ' + str(p_v)
+    print 'Victim percent bootstrap: ' + str(bootstrap_v)
     print
