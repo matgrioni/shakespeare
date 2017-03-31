@@ -18,44 +18,6 @@ from shakespeare import Play
 BOOTSTRAP_NUM_SAMPLES = 1000
 BOOTSTRAP_SAMPLE_SIZE = 100
 
-# Goes through every atom in the play and returns a dictionary where the
-# annotations are keys, and the lines between the BEGIN and END annotations
-# are the values. The annotations are transformed into a 3-tuple of the form
-# (ID, Desc, Num), where ID is the identifier for the annotation such as 'GonL',
-# Desc, is something like 'PLAN', or 'HOSTILE', and Num is simply a number.
-# NOTE: This function isn't being used right now. It is a hold over from my
-# first thoughts on the project.
-def find_inter_annotations(play):
-    BEGIN_ANNOTATION = '^(.+)_(.+)_(\d+)_BEGIN$'
-    END_ANNOTATION = '^(.+)_(.+)_(\d+)_END$'
-
-    inters = collections.defaultdict(list)
-
-    active = []
-    for atom in play.atoms:
-        # If this atom is a begin annotation, then add it's id to the list of
-        # current active annotations.
-        m = re.match(BEGIN_ANNOTATION, atom.content)
-        if m:
-            active.append(m.groups())
-
-            # Do not add the annotation to inters dict.
-            continue
-        else:
-            m = re.match(END_ANNOTATION, atom.content)
-            if m:
-                try:
-                    active.remove(m.groups())
-                except ValueError:
-                    pass
-
-        # For each active annotation's id, add the current atom to the inters
-        # dictionary under the id.
-        for ann_id in active:
-            inters[ann_id].append(atom)
-
-    return inters
-
 # Condense the PlayAtoms of the given character from the provided list (which may
 # include lines from other characters) into sentences. This will return one
 # continuous string of the desired characters dialogue from the given PlayAtoms.
