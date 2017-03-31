@@ -63,6 +63,5 @@ def bootstrap(objects, num_samples, sample_size, sample_value):
 
     values = map(sample_value, samples)
     values.sort()
-    print values
 
     return (values[lower], values[upper])
