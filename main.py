@@ -15,7 +15,7 @@ from pycorenlp import StanfordCoreNLP
 import analysis
 from shakespeare import Play
 
-BOOTSTRAP_NUM_SAMPLES = 1000
+BOOTSTRAP_NUM_SAMPLES = 5000
 BOOTSTRAP_SAMPLE_SIZE = 100
 
 # Condense the PlayAtoms of the given character from the provided list (which may
