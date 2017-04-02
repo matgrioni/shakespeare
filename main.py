@@ -92,18 +92,18 @@ victim_sents = analysis.sentiment(nlp, victim_diag)
 
 if len(betrayer_sents) > 0:
     p_b = sentiments_to_percent_positive(betrayer_sents)
-    bootstrap_b = analysis.bootstrap(betrayer_sents, BOOTSTRAP_NUM_SAMPLES,
-                                     BOOTSTRAP_SAMPLE_SIZE,
-                                     sentiments_to_percent_positive)
+    bootstrap_b = analysis.bootstrap(betrayer_sents,
+                                     sentiments_to_percent_positive,
+                                     BOOTSTRAP_NUM_SAMPLES)
 else:
     p_b = 0
     bootstrap_b = 0
 
 if len(victim_sents) > 0:
     p_v = sentiments_to_percent_positive(victim_sents)
-    bootstrap_v = analysis.bootstrap(victim_sents, BOOTSTRAP_NUM_SAMPLES,
-                                     BOOTSTRAP_SAMPLE_SIZE,
-                                     sentiments_to_percent_positive)
+    bootstrap_v = analysis.bootstrap(victim_sents,
+                                     sentiments_to_percent_positive,
+                                     BOOTSTRAP_NUM_SAMPLES)
 else:
     p_v = 0
     bootstrap_v = 0
@@ -111,11 +111,11 @@ else:
 # Print out the results.
 print 'Betrayer sentences: ' + str(len(betrayer_sents))
 print 'Betrayer words: ' + str(len(betrayer_diag.split(' ')))
-print 'Betrayer percent positive: ' + str(p_b)
-print 'Betrayer percent bootstrap: ' + str(bootstrap_b[0:2])
-print 'Betrayer SE: ' + str(bootstrap_b[2])
+print 'Betrayer percent of sentences positive: ' + str(p_b)
+print 'Betrayer bootstrapped CI (95%): ' + str(bootstrap_b[0:2])
+print 'Betrayer bootstrapped SE: ' + str(bootstrap_b[2])
 print 'Victim sentences: ' + str(len(victim_sents))
 print 'Victim words: ' + str(len(victim_diag.split(' ')))
-print 'Victim percent positive: ' + str(p_v)
-print 'Victim percent bootstrap: ' + str(bootstrap_v[0:2])
-print 'Victim SE: ' + str(bootstrap_v[2])
+print 'Victim percent of sentences positive: ' + str(p_v)
+print 'Victim bootstrapped CI (95%): ' + str(bootstrap_v[0:2])
+print 'Victim bootstrapped SE: ' + str(bootstrap_v[2])

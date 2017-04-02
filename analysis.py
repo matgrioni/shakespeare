@@ -40,14 +40,16 @@ def _get_scalar_sentiment(sentence):
         return 0
 
 # Runs an estimated confidence interval and SE from the given values. For any
-# type of objects a standard error range will be returned as a two-tuple. The
-# two-tuple will be of the format (min, max), where ~2.5% of the samples had a
-# value less than min, and ~2.5% of the samples had an value greater than max.
-# You are guaranteed at maximum these percentages. The actual percentages may be
-# less depending on the number of samples. Lastly, since the objects can be any
-# arbitrary objects a callback, sample_value must be provided that accepts a
-# sample and returns a scalar value. This is the value that is used to compare
-# samples.
+# type of objects a confidence interval will be returned as the first two
+# elements. ~2.5% of samples had a value less than the first element, and ~2.5%
+# of the samples had an value greater than the second element. You are
+# guaranteed at maximum these percentages. The actual percentages may be less
+# depending on truncation of decimals. Since the objects can be any arbitrary
+# objects, a callback, sample_value must be provided that accepts a sample and
+# returns a scalar value. This is the value that is used to compare samples. The
+# sample_size is used for the size of the bootstrapped samples, but if the value
+# is omitted or less than 0, then the sample size is the size of the original
+# list of objects.
 #
 # For example if the sample_value function returns the average of the sample,
 # then this method returns the variance of objects average. If sample_value
@@ -58,7 +60,9 @@ def _get_scalar_sentiment(sentence):
 # The return tuple is structured as follows:
 #   (min_ci, max_ci, se)
 # Note that these values are bootstraped estimates.
-def bootstrap(objects, num_samples, sample_size, sample_value):
+def bootstrap(objects, sample_value, num_samples, sample_size=-1):
+    if sample_size < 0:
+        sample_size = len(objects)
     samples = numpy.random.choice(objects, size=(num_samples, sample_size),
                                   replace=True).tolist()
 
