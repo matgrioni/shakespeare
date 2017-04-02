@@ -62,59 +62,60 @@ with open(ann_key_filename, 'r') as f:
 
 p = Play(play_filename)
 
-# Each annotation consists of the key value in the tex and also a dyad or pair
+# Each annotation consists of the key value in the text and also a dyad or pair
 # of characters involved in the betrayal.
-for key, info in annotations.items():
-    prior_betrayal = []
+betrayer_lines = []
+victim_lines = []
+
+# TODO: Try to think of how to get rid of this loop.
+for label, info in annotations.items():
     for atom in p.atoms:
-        m = re.search(key + '_HOSTILE_' + info[2]  + '_BEGIN', atom.content)
+        m = re.search(label + '_HOSTILE_' + info[2]  + '_BEGIN', atom.content)
         if m:
             break
 
         try:
-            if (atom.speaker == info[0] and info[1] in atom.audience) or \
-               (atom.speaker == info[1] and info[0] in atom.audience):
-                prior_betrayal.append(atom)
+            if atom.speaker == info[0] and info[1] in atom.audience:
+                betrayer_lines.append(atom.content)
+            elif atom.speaker == info[1] and info[0] in atom.audience:
+                victim_lines.append(atom.content)
         except AttributeError:
             # The atom was an Annotation or a StageNote and so does not have a
             # speaker or audience.
             pass
 
-    # From all the PlayAtoms extracted before the first hosility, condense the
-    # betrayer's and victim's lines into one continuous string. This string will
-    # be provided to the StanfordCoreNLP server.
-    betrayer_diag = condense_character_lines(info[0], prior_betrayal)
-    victim_diag = condense_character_lines(info[1], prior_betrayal)
+betrayer_diag = ' '.join(betrayer_lines)
+victim_diag = ' '.join(victim_lines)
 
-    betrayer_sents = analysis.sentiment(nlp, betrayer_diag)
-    victim_sents = analysis.sentiment(nlp, victim_diag)
+betrayer_sents = analysis.sentiment(nlp, betrayer_diag)
+victim_sents = analysis.sentiment(nlp, victim_diag)
 
-    if len(betrayer_sents) > 0:
-        p_b = sentiments_to_percent_positive(betrayer_sents)
-        bootstrap_b = analysis.bootstrap(betrayer_sents, BOOTSTRAP_NUM_SAMPLES,
-                                         BOOTSTRAP_SAMPLE_SIZE,
-                                         sentiments_to_percent_positive)
-    else:
-        p_b = 0
-        bootstrap_b = 0
+if len(betrayer_sents) > 0:
+    p_b = sentiments_to_percent_positive(betrayer_sents)
+    bootstrap_b = analysis.bootstrap(betrayer_sents, BOOTSTRAP_NUM_SAMPLES,
+                                     BOOTSTRAP_SAMPLE_SIZE,
+                                     sentiments_to_percent_positive)
+else:
+    p_b = 0
+    bootstrap_b = 0
 
-    if len(victim_sents) > 0:
-        p_v = sentiments_to_percent_positive(victim_sents)
-        bootstrap_v = analysis.bootstrap(victim_sents, BOOTSTRAP_NUM_SAMPLES,
-                                         BOOTSTRAP_SAMPLE_SIZE,
-                                         sentiments_to_percent_positive)
-    else:
-        p_v = 0
-        bootstrap_v = 0
+if len(victim_sents) > 0:
+    p_v = sentiments_to_percent_positive(victim_sents)
+    bootstrap_v = analysis.bootstrap(victim_sents, BOOTSTRAP_NUM_SAMPLES,
+                                     BOOTSTRAP_SAMPLE_SIZE,
+                                     sentiments_to_percent_positive)
+else:
+    p_v = 0
+    bootstrap_v = 0
 
-    # Print out the results.
-    print key
-    print 'Betrayer sentences: ' + str(len(betrayer_sents))
-    print 'Betrayer words: ' + str(len(betrayer_diag.split(' ')) - 1)
-    print 'Betrayer percent positive: ' + str(p_b)
-    print 'Betrayer percent bootstrap: ' + str(bootstrap_b)
-    print 'Victim sentences: ' + str(len(victim_sents))
-    print 'Victim words: ' + str(len(victim_diag.split(' ')) - 1)
-    print 'Victim percent positive: ' + str(p_v)
-    print 'Victim percent bootstrap: ' + str(bootstrap_v)
-    print
+# Print out the results.
+print 'Betrayer sentences: ' + str(len(betrayer_sents))
+print 'Betrayer words: ' + str(len(betrayer_diag.split(' ')))
+print 'Betrayer percent positive: ' + str(p_b)
+print 'Betrayer percent bootstrap: ' + str(bootstrap_b[0:2])
+print 'Betrayer SE: ' + str(bootstrap_b[2])
+print 'Victim sentences: ' + str(len(victim_sents))
+print 'Victim words: ' + str(len(victim_diag.split(' ')))
+print 'Victim percent positive: ' + str(p_v)
+print 'Victim percent bootstrap: ' + str(bootstrap_v[0:2])
+print 'Victim SE: ' + str(bootstrap_v[2])
