@@ -39,11 +39,11 @@ def _get_scalar_sentiment(sentence):
     else:
         return 0
 
-# Runs a bootstrap error for standord errors in the values. For any type of
-# objects a standard error range will be returned as a two-tuple. The two-tuple
-# will be of the format (min, max), where ~2.5% of the samples had a value
-# less than min, and ~2.5% of the samples had an value greater than max. You
-# are guaranteed at maximum these percentages. The actual percentages may be
+# Runs an estimated confidence interval and SE from the given values. For any
+# type of objects a standard error range will be returned as a two-tuple. The
+# two-tuple will be of the format (min, max), where ~2.5% of the samples had a
+# value less than min, and ~2.5% of the samples had an value greater than max.
+# You are guaranteed at maximum these percentages. The actual percentages may be
 # less depending on the number of samples. Lastly, since the objects can be any
 # arbitrary objects a callback, sample_value must be provided that accepts a
 # sample and returns a scalar value. This is the value that is used to compare
@@ -54,14 +54,25 @@ def _get_scalar_sentiment(sentence):
 # calculates the percentage of values greater than 0, then this method returns
 # the variance of the percentage of values greater than 0 in the entire objects
 # list.
+#
+# The return tuple is structured as follows:
+#   (min_ci, max_ci, se)
+# Note that these values are bootstraped estimates.
 def bootstrap(objects, num_samples, sample_size, sample_value):
     samples = numpy.random.choice(objects, size=(num_samples, sample_size),
                                   replace=True).tolist()
 
-    lower = int(num_samples * 0.025)
-    upper = min(int(math.ceil(num_samples * 0.975)) - 1, num_samples - 1)
-
     values = map(sample_value, samples)
     values.sort()
 
-    return (values[lower], values[upper])
+    sd = _sd(values)
+
+    lower = int(num_samples * 0.025)
+    upper = min(int(math.ceil(num_samples * 0.975)) - 1, num_samples - 1)
+
+    return (values[lower], values[upper], sd)
+
+def _sd(values):
+    mean = reduce(lambda ag, v: ag + v, values, 0) / len(values)
+    vr = 1 / len(values) * reduce(lambda ag, v: ag + (v - mean) ** 2, values, 0)
+    return math.sqrt(vr)
