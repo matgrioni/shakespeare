@@ -18,13 +18,28 @@ import numpy
 #    1: Positive
 #    0: Neutral
 #   -1: Negative
-def sentiment(nlp, text):
-    result = nlp.annotate(text, properties={
-        'annotators':   'sentiment',
-        'outputFormat': 'json'
-    })
+# As a bonus, this method will automatically break up the text as needed by
+# number of characters as an optional parameter. For large text, this allows you
+# to not violate the timeout on the StanfordCoreNLP server instance.
+def sentiment(nlp, text, step=None):
+    results = []
+    if step is None or step <= 0:
+        step = len(text)
 
-    return map(_get_scalar_sentiment, result['sentences'])
+    i = 0
+    while i < len(text):
+        # TODO. Go to nearest sentence marker
+        temp = text[i : i + step]
+        result = nlp.annotate(temp, properties={
+            'annotators':   'sentiment',
+            'outputFormat': 'json'
+        })
+
+        results += map(_get_scalar_sentiment, result['sentences'])
+
+        i += step
+
+    return results
 
 # Internal method to return a 1, 0, or -1 based the result from the Stanford
 # Core NLP server. The sentence object is a json object that comes from each
