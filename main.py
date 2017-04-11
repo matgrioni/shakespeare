@@ -7,6 +7,7 @@
 from __future__ import division
 
 import collections
+from functools import partial
 import itertools
 import re
 import sys
@@ -37,8 +38,19 @@ def condense_character_lines(character, lines):
 
     return ' '.join(blurbs)
 
+def non_hostile_choices_left(hostile_dyads, names):
+    for dyad in itertools.combinations(names, 2):
+        rev = (names[1], names[1])
+        if dyad in hostile_dyads or rev in hostile_dyads:
+            return True
+
+    return False
+
 def sentiments_to_percent_positive(sents):
     return sum(s > 0 for s in sents) / len(sents)
+
+def valid_non_hostile(play, c_name):
+    return play.character_info[c_name].line_count > 50
 
 ################################################################################
 #
@@ -66,22 +78,22 @@ with open(ann_key_filename, 'r') as f:
 
 # Now we have to find out all the non-hostile dyads and arbitrairly assign a
 # betrayer and victim to them.
-# TODO: Maybe use frozenset instead.
-names = map(lambda c: c.short or c.name, p.characters)
+# TODO: Very inefficient...
+names = filter(partial(valid_non_hostile, p), map(lambda c: c.short or c.name, p.characters))
 non_hostile_dyads = []
-while len(names) > 1:
-    choices = tuple(numpy.random.choice(names, size=2))
+while non_hostile_choices_left(hostile_dyads, names):
+    choices = tuple(numpy.random.choice(names, size=2, replace=False))
     rev_choices = (choices[1], choices[0])
 
     while choices in hostile_dyads or rev_choices in hostile_dyads:
-        choices = numpy.random.choice(names, size=2)
+        choices = tuple(numpy.random.choice(names, size=2, replace=False))
+        rev_choices = (choices[1], choices[0])
 
     names.remove(choices[0])
     names.remove(choices[1])
 
     non_hostile_dyads.append(choices)
 
-print hostile_dyads
 print non_hostile_dyads
 
 # Each annotation consists of the key value in the text and also a dyad or pair
