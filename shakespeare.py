@@ -10,18 +10,21 @@
 from collections import namedtuple
 import re
 
+from recordclass import recordclass
+
 PlayAtom = namedtuple('PlayAtom', ['act', 'scene', 'num', 'content'])
 StageNote = namedtuple('StageNote', PlayAtom._fields + ('context',))
 Annotation = namedtuple('Annotation', PlayAtom._fields)
 Line = namedtuple('Line', PlayAtom._fields + ('speaker', 'audience'))
 
 Character = namedtuple('Character', ['name', 'short', 'desc'])
+CharacterInfo = recordclass('CharacterInfo', ['line_count'])
 
 class Play(object):
     ACT_HEADER = '^ACT (\d+)$'
     SCENE_HEADER = '^Scene (\d+)$'
     STAGE_NOTES = '\[(.+)\]|\[([^\]]+)|([^\[]+)\]'
-    CHARACTER = '^([A-Z]+),?\s*'
+    CHARACTER = '^([A-Z]+)(?![a-z]),?\s*'
     PADDING = '^=+$'
 
     ANNOTATION = '^\{(.+)\}$'
@@ -54,6 +57,7 @@ class Play(object):
     # one must be able to tell if a potential character is actually a character.
     def _parse_characters(self):
         self.characters = []
+        self.character_info = {}
 
         header_found = False
         for line in self.raw_lines:
@@ -73,6 +77,7 @@ class Play(object):
                     short = name[idx + len(Play.CHARACTER_OF):]
 
                 self.characters.append(Character(name, short, desc))
+                self.character_info[short or name] = CharacterInfo(0)
 
             if not header_found:
                 header_found = line == Play.CHARACTERS_SECTION_HEADER
@@ -180,6 +185,13 @@ class Play(object):
                     else:
                         l = Line(act, scene, line_num, line, character, aud.copy())
                         self.atoms.append(l)
+                        try:
+                            self.character_info[character].line_count += 1
+                        except KeyError:
+                            # This helps handle situations like O or I, at the
+                            # beginning of a line where it is unclear if it is a
+                            # character name.
+                            pass
 
                         line_num += 1
                 else:
